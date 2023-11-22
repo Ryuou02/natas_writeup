@@ -1,0 +1,121 @@
+natas 0
+
+the password for the next level can be found by viewing source code
+----------------------------------------------------------------------
+
+natas1
+
+the right clicking has been blocked but we can still find the source code in http history, by seeing server response for that particular page
+----------------------------------------------------------------------
+
+natas2
+
+it says there is nothing in the page, when we view the source code, we can see a file pixel.png, on opening it, we won't see anything but in the url, we remove the pixel.png and make it look like this
+http://natas2.natas.labs.overthewire.org/files/
+then we can see the file index page. from there we can go to
+http://natas2.natas.labs.overthewire.org/files/users.txt
+and get password to natas3
+----------------------------------------------------------------------
+
+natas3
+
+in the page source, it says not even google will find out about it this time. this is a clue saying talking about the web crawlers of google, and they won't go through anything written in the robots.txt file. hence by viewing the robots.txt file in the site, we can see that it disallows a directory called /s3cr3t/
+
+hence we go to that directory and it opens the file index. through the file index, we go to the file users.txt which contains password to natas4
+
+
+----------------------------------------------------------------------
+natas4
+
+in this, we just need to change the http header 'Referer' to http://natas5.natas.labs.overthewire.org/
+
+----------------------------------------------------------------------
+
+natas5
+
+the websie says that I'm not logged in. in the http request, we can see a cookie called 'loggedin' being set to 0.
+we just need to set it to 1.
+
+----------------------------------------------------------------------
+
+natas6
+
+the website has a text box with a message above it asking to input secret. we can also view the php source code to the site.
+
+include "includes/secret.inc";
+
+if($secret == $_POST['secret']) {
+        print "Access granted. The password for natas7 is <censored>";
+
+we just need to focus on the above 3 lines of code
+
+the $secret variable is taken from the included directory, hence we just need to go there to find the secret
+
+we get the secret to be FOEIUWGHFEEUHOFUOIU
+
+then we put it in the text box, in the main page and get password to natas7
+
+----------------------------------------------------------------------
+
+natas7
+
+the main page of the website contains 2 buttons, one for home page and other for about page
+
+on viewing page source, it gives a hint saying that the password to natas 8 is located in /etc/natas_webpass/natas8	
+hence, I just put this directory directly into the page parameter of the get request and it gives password to natas8
+
+----------------------------------------------------------------------
+
+natas8
+
+on viewing the php page source, we see a variable called encodedsecret.
+
+our input gets encoded by a function encodeSecret(), we need to match the encoded secret with our input.
+seeing the processes,
+first our input is base64 encoded, then reversed, and finally converted to hex.
+hence we can decode the encoded string by reversing this order.
+
+first we will convert it back from hex. then reverse it and finally base64 decode it.
+
+using php, we can write code like
+
+echo base64_decode(strrev(hex2bin($encodedSecret)));
+
+to get the secret we're supposed to use
+
+----------------------------------------------------------------------
+
+natas9
+
+on viewing the php page source for this, we can see that it is basically doing 
+grep -i [input] dictionary.txt
+
+hence we can easily go to the directory /etc/natas_webpass/natas10 through exploiting this
+
+all we need to do is end the current command that is about to execute using a semicolon ';' and use cat to view the required file
+and end it with a '#' to comment out the dictionary.txt part.
+
+our input will finally look like
+
+; cat /etc/natas_webpass/natas10 #
+
+hence we get password to natas10
+
+----------------------------------------------------------------------
+
+natas10
+
+this time we can see that the page is filtering out the semicolon
+hence we need to use a different approach.
+
+we just need to write some character that may be present in the password followed by the directory to /etc/natas_webpass/natas11
+
+so that it will search for that particular character within the password and return the entire password if the character exists in that file.
+
+hence we write query like 
+k /etc/natas_webpass/natas11 #
+
+and since k exists in the password, we get the password to natas11.
+
+
+

